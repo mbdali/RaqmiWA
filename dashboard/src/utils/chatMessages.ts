@@ -61,7 +61,14 @@ export function mergeChatMessages(db: ChatMessage[], history: ChatMessage[]): Ch
     if (m.type === 'poll' && !m.metadata?.poll && hist?.metadata?.poll) {
       merged = { ...merged, metadata: { ...merged.metadata, poll: hist.metadata.poll } };
     }
-    if (m.type === 'revoked' || hist?.type === 'revoked') {
+    const isAuditPreserved =
+      Boolean(merged.metadata?.revoked) ||
+      Boolean(m.metadata?.revoked) ||
+      Boolean(hist?.metadata?.revoked) ||
+      (m.type === 'revoked' && Boolean(m.body || m.mediaPath)) ||
+      (hist?.type === 'revoked' && Boolean(hist.body || hist.mediaPath));
+
+    if (!isAuditPreserved && (m.type === 'revoked' || hist?.type === 'revoked')) {
       merged = { ...merged, type: 'revoked', body: '', metadata: undefined };
     }
     byId.set(key, merged);
@@ -258,6 +265,7 @@ export interface ChatMessageView extends ChatMessage {
     quotedMessage?: { id: string; body: string };
     reactions?: Record<string, string>;
     edited?: boolean;
+    revoked?: { revoked?: boolean; revokedAt?: number; revokedBy?: string } | boolean;
     call?: { video: boolean; missed: boolean };
     buttons?: Array<{ id: string; text: string }>;
     poll?: { name: string; options: string[]; allowMultipleAnswers: boolean };
@@ -379,7 +387,13 @@ function mergeMessageMetadata(
 export function mergeOrAppend(list: ChatMessageView[], incoming: ChatMessageView): ChatMessageView[] {
   const idx = list.findIndex(m => msgKey(m) === msgKey(incoming));
   if (idx === -1) {
-    const message = incoming.type === 'revoked' ? { ...incoming, body: '', metadata: undefined } : incoming;
+    const isAuditPreserved =
+      Boolean(incoming.metadata?.revoked) ||
+      (incoming.type === 'revoked' && Boolean(incoming.body || incoming.mediaPath));
+    const message =
+      incoming.type === 'revoked' && !isAuditPreserved
+        ? { ...incoming, body: '', metadata: undefined }
+        : incoming;
     return capMediaPayloads([...list, message]);
   }
   const existing = list[idx];
@@ -391,7 +405,14 @@ export function mergeOrAppend(list: ChatMessageView[], incoming: ChatMessageView
     status: mergeDeliveryStatus(existing.status, incoming.status) ?? incoming.status,
     metadata: mergeMessageMetadata(existing.metadata, incoming.metadata),
   };
-  if (existing.type === 'revoked' || incoming.type === 'revoked') {
+  const isAuditPreserved =
+    Boolean(next[idx].metadata?.revoked) ||
+    Boolean(existing.metadata?.revoked) ||
+    Boolean(incoming.metadata?.revoked) ||
+    (existing.type === 'revoked' && Boolean(existing.body || existing.mediaPath)) ||
+    (incoming.type === 'revoked' && Boolean(incoming.body || incoming.mediaPath));
+
+  if (!isAuditPreserved && (existing.type === 'revoked' || incoming.type === 'revoked')) {
     next[idx] = { ...next[idx], type: 'revoked', body: '', metadata: undefined };
   }
   return capMediaPayloads(next);

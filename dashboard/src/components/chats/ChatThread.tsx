@@ -28,6 +28,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useRole } from '../../hooks/useRole';
+import { useAuditMode } from '../../hooks/useAuditMode';
 import { sessionApi, type Chat } from '../../services/api';
 import {
   buildMentionNameMap,
@@ -175,14 +176,18 @@ function ChatThread({
   // Reply, react, delete and prompt taps all need an operator key, like the composer; a viewer
   // would only reach a 403.
   const { canWrite } = useRole();
+  const { auditMode } = useAuditMode();
 
   // The message actions sit behind hover, so a keyboard user reaches them through the bubble that carries
   // them: the bubbles are one tab stop (the focused message, else the newest), the arrow keys move between
   // them, and the actions show while focus is inside a bubble, unless a pointer brought it (Chats.css).
   // Links, previews and buttons inside a message stay stops of their own.
   const hasActions = useCallback(
-    (message: ChatMessageView) => canWrite && message.type !== 'revoked' && Boolean(message.waMessageId),
-    [canWrite],
+    (message: ChatMessageView) => {
+      const isRev = message.type === 'revoked' || Boolean(message.metadata?.revoked);
+      return canWrite && (!isRev || auditMode) && Boolean(message.waMessageId);
+    },
+    [canWrite, auditMode],
   );
   const [focusedMessageId, setFocusedMessageId] = useState<string | null>(null);
   const tabStopId = useMemo(() => {
@@ -701,8 +706,14 @@ function ChatThread({
           const mediaInfo = msg.metadata?.media;
           const displayBody = msg.body || (msg.type === 'poll' ? msg.metadata?.poll?.name : undefined);
 
+          const isAuditRevoked =
+            Boolean(msg.metadata?.revoked) ||
+            (msg.type === 'revoked' && Boolean(msg.body || msg.mediaPath || msg.metadata?.media));
+          const showRevokedAsAudit = isAuditRevoked && auditMode;
+          const isRevoked = msg.type === 'revoked' || isAuditRevoked;
+
           const renderMedia = () => {
-            if (msg.type === 'revoked') return null;
+            if (isRevoked && !showRevokedAsAudit) return null;
             // location/call have no downloadable media payload — render them before the
             // mediaInfo gate. The raw body (a base64 thumbnail / empty token) is suppressed below.
             if (msg.type === 'location') {
@@ -1057,7 +1068,7 @@ function ChatThread({
                   <div
                     className={`message-bubble ${isMe ? 'outgoing' : 'incoming'} ${msg.status} ${
                       isMediaMessage ? 'media-type' : ''
-                    } ${isRevoked ? 'revoked-type' : ''}`}
+                    } ${isRevoked && !showRevokedAsAudit ? 'revoked-type' : ''} ${showRevokedAsAudit ? 'audit-preserved-type' : ''}`}
                   >
                     {/* Group sender label (WhatsApp-style: coloured name atop the bubble) */}
                     {/* Group sender label (WhatsApp-style: coloured name atop the bubble).
@@ -1141,17 +1152,43 @@ function ChatThread({
                     {/* Text flows inline and ends in an invisible spacer as wide as the time and ticks, so the
                       meta tucks into the last line when it fits and wraps below it only when it does not. */}
                     <div className="message-content">
-                      {isRevoked ? (
+                      {isRevoked && !showRevokedAsAudit ? (
                         <div className="message-text">{t('chats.messageDeleted')}</div>
                       ) : isMasked ? (
                         <div className="message-text message-masked">{t('chats.messageMasked')}</div>
                       ) : (
-                        displayBody &&
-                        (!mediaInfo || displayBody !== mediaInfo.filename) &&
-                        msg.type !== 'location' &&
-                        msg.type !== 'call' && (
-                          <MessageBody text={resolveMentions(displayBody, mentionNames)} className="message-text" />
-                        )
+                        <>
+                          {showRevokedAsAudit && (
+                            <div
+                              className="audit-revoked-badge"
+                              title={t(
+                                'chats.auditRevokedDesc',
+                                'This message was deleted by the sender on WhatsApp but preserved for compliance audit.',
+                              )}
+                            >
+                              <svg
+                                width="12"
+                                height="12"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                style={{ flexShrink: 0 }}
+                              >
+                                <path d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                              </svg>
+                              <span>{t('chats.auditRevoked', 'Deleted by sender (Preserved for Audit)')}</span>
+                            </div>
+                          )}
+                          {displayBody &&
+                            (!mediaInfo || displayBody !== mediaInfo.filename) &&
+                            msg.type !== 'location' &&
+                            msg.type !== 'call' && (
+                              <MessageBody text={resolveMentions(displayBody, mentionNames)} className="message-text" />
+                            )}
+                        </>
                       )}
 
                       {!isRevoked && msg.type === 'poll' && (msg.metadata?.poll?.options?.length ?? 0) > 0 && (

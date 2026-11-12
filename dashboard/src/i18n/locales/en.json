@@ -147,6 +147,12 @@
     "deleteConfirm": "Delete this message for everyone?",
     "promptButtons": "Message choices",
     "messageDeleted": "🚫 This message was deleted",
+    "auditRevoked": "Deleted by sender (Preserved for Audit)",
+    "auditRevokedDesc": "This message was deleted by the sender on WhatsApp but preserved for compliance audit.",
+    "auditModeOn": "Audit: ON",
+    "auditModeOff": "Audit: OFF",
+    "auditModeOnTooltip": "Audit Mode: ON (Showing deleted messages). Click to switch to normal view.",
+    "auditModeOffTooltip": "Audit Mode: OFF (Showing normal WhatsApp view). Click to show deleted messages.",
     "messageMasked": "🔒 Masked by WhatsApp for linked devices — check your primary phone",
     "kind": {
       "group": "Group",

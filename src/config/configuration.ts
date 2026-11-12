@@ -456,6 +456,12 @@ export default () => ({
     inlineMode: process.env.MESSAGE_INLINE_MEDIA === 'archive' ? ('archive' as const) : ('inline' as const),
   },
 
+  // Audit compliance & monitoring vault mode: preserves revoked messages and attachments.
+  audit: {
+    complianceMode: process.env.AUDIT_COMPLIANCE_MODE === 'true',
+    preserveRevoked: process.env.PRESERVE_REVOKED_MESSAGES === 'true' || process.env.AUDIT_COMPLIANCE_MODE === 'true',
+  },
+
   // Session ownership across processes. A session's engine runs in exactly one process; these
   // record which, so a second process booting beside a live one does not disturb its sessions.
   session: {

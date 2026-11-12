@@ -338,6 +338,8 @@ export interface ChatMessage {
     reactions?: Record<string, string>;
     /** The gateway observed an edit of this message. */
     edited?: boolean;
+    /** Present when a message was deleted by sender on WhatsApp but preserved for audit compliance. */
+    revoked?: { revoked?: boolean; revokedAt?: number; revokedBy?: string } | boolean;
     call?: { video: boolean; missed: boolean };
     /** Business prompt choices (Baileys). Present on inbound prompts that offer buttons. */
     buttons?: Array<{ id: string; text: string }>;

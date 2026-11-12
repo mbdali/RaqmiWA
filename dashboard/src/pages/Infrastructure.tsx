@@ -13,7 +13,9 @@ import {
   AlertTriangle,
   Download,
   Upload,
+  ShieldAlert,
 } from 'lucide-react';
+import { useAuditMode } from '../hooks/useAuditMode';
 import { API_BASE_URL, infraApi, type SavedConfig, type SaveConfigPayload } from '../services/api';
 import { copyToClipboard } from '../utils/clipboard';
 import { CONTAINER_OF, namesBundledContainer, sameHost } from '../utils/bundledHost';
@@ -80,6 +82,7 @@ export function Infrastructure() {
   const { t } = useTranslation();
   useDocumentTitle(t('infrastructure.title'));
   const toast = useToast();
+  const { auditMode, setAuditMode } = useAuditMode();
   const { data: infraStatus, isLoading: loading } = useInfraStatusQuery();
   const { data: savedConfig, isLoading: configLoading } = useInfraConfigQuery();
   const { data: engines = [] } = useEnginesQuery();
@@ -1096,6 +1099,111 @@ export function Infrastructure() {
                 )}
               </>
             )}
+          </div>
+        </section>
+
+        {/* Compliance & Audit Vault */}
+        <section className="infra-card">
+          <div className="card-header">
+            <div className="header-left">
+              <ShieldAlert size={20} />
+              <h2>{t('infrastructure.audit.title', 'Compliance & Audit Vault')}</h2>
+            </div>
+            <span className={`status-indicator ${auditMode ? 'connected' : 'sqlite'}`}>
+              ● {auditMode ? t('infrastructure.audit.active', 'Audit Active') : t('infrastructure.audit.normal', 'Normal View')}
+            </span>
+          </div>
+
+          <p className="section-description">
+            {t(
+              'infrastructure.audit.description',
+              'Preserve deleted messages, voice notes, documents, and media for audit compliance. When enabled, deleted messages are kept in storage and displayed with an audit stamp instead of being hidden.',
+            )}
+          </p>
+
+          <div
+            style={{
+              marginTop: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '1rem',
+              background: 'var(--bg-secondary, rgba(0,0,0,0.03))',
+              borderRadius: '8px',
+              border: '1px solid var(--border-color, #e2e8f0)',
+            }}
+          >
+            <div>
+              <strong style={{ display: 'block', fontSize: '0.95rem', marginBottom: '0.25rem' }}>
+                {t('infrastructure.audit.toggleTitle', 'Show Revoked Messages (Audit Mode)')}
+              </strong>
+              <small style={{ color: 'var(--text-secondary, #64748b)' }}>
+                {t(
+                  'infrastructure.audit.toggleSubtitle',
+                  'Reveals original text and attachments of messages deleted by sender on WhatsApp. Takes effect immediately without restarting the server.',
+                )}
+              </small>
+            </div>
+            <label
+              className="toggle-switch"
+              style={{
+                position: 'relative',
+                display: 'inline-block',
+                width: '48px',
+                height: '26px',
+                flexShrink: 0,
+                marginLeft: '1rem',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={auditMode}
+                onChange={e => {
+                  const enabled = e.target.checked;
+                  setAuditMode(enabled);
+                  if (enabled) {
+                    toast.success(
+                      t('infrastructure.audit.toastEnabledTitle', 'Audit Mode Enabled'),
+                      t('infrastructure.audit.toastEnabledDesc', 'Revoked messages and attachments are now visible in chats.'),
+                    );
+                  } else {
+                    toast.info(
+                      t('infrastructure.audit.toastDisabledTitle', 'Audit Mode Disabled'),
+                      t('infrastructure.audit.toastDisabledDesc', 'Chats now display the standard WhatsApp deleted view.'),
+                    );
+                  }
+                }}
+                style={{ opacity: 0, width: 0, height: 0 }}
+              />
+              <span
+                style={{
+                  position: 'absolute',
+                  cursor: 'pointer',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: auditMode ? '#ef4444' : '#cbd5e1',
+                  transition: '0.3s',
+                  borderRadius: '26px',
+                }}
+              >
+                <span
+                  style={{
+                    position: 'absolute',
+                    content: '""',
+                    height: '20px',
+                    width: '20px',
+                    left: auditMode ? '24px' : '4px',
+                    bottom: '3px',
+                    backgroundColor: 'white',
+                    transition: '0.3s',
+                    borderRadius: '50%',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                  }}
+                />
+              </span>
+            </label>
           </div>
         </section>
       </div>

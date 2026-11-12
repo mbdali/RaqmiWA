@@ -357,6 +357,15 @@ export class MessageProjector {
     });
   }
 
+  private isAuditMode(): boolean {
+    return (
+      process.env.AUDIT_COMPLIANCE_MODE === 'true' ||
+      process.env.PRESERVE_REVOKED_MESSAGES === 'true' ||
+      this.configService?.get?.('audit.complianceMode') === true ||
+      this.configService?.get?.('audit.preserveRevoked') === true
+    );
+  }
+
   /** Stamp the session's last-active time, at most once per {@link LAST_ACTIVE_WRITE_WINDOW_MS} for this engine. */
   private touchLastActive(id: string, engine: IWhatsAppEngine): void {
     const now = Date.now();
@@ -989,6 +998,15 @@ export class MessageProjector {
    * no edit. Returns whether the row is written cleared.
    */
   private applyHeldChanges(dbMessage: Message, entry: InFlightEntry): boolean {
+    if (this.isAuditMode()) {
+      if (dbMessage.type === 'revoked' || entry?.revoked) {
+        dbMessage.metadata = {
+          ...((dbMessage.metadata as Record<string, unknown>) || {}),
+          revoked: { revoked: true, revokedAt: Date.now() },
+        };
+        return false;
+      }
+    }
     if (dbMessage.type === 'revoked') {
       Object.assign(dbMessage, REVOKED_ROW_PATCH);
       return true;
@@ -1248,16 +1266,22 @@ export class MessageProjector {
    * is taken back only if the revoke agrees with it, and the row is cleared only if the revoke is not
    * foreign to it. Without one, the revoke was judged by the caller (the engine's revoke event is).
    */
-  recordRevoke(sessionId: string, waMessageId: string, source?: MutationSource, announced = false): Promise<void> {
+  recordRevoke(
+    sessionId: string,
+    waMessageId: string,
+    source?: MutationSource,
+    announced = false,
+    fromApp = false,
+  ): Promise<void> {
     let stored: Promise<void> | undefined;
     const pending = this.changeInFlight(sessionId, waMessageId, source, (needsRow, entry) => {
       if (entry && !needsRow) {
-        this.holdRevoked(sessionId, entry);
+        this.holdRevoked(sessionId, entry, fromApp);
         if (announced) entry.revokeAnnounced = true;
       }
       stored = new Promise(resolve =>
         this.enqueueMessageMutation(sessionId, waMessageId, () =>
-          this.revokeRow(sessionId, waMessageId, true, source).finally(resolve),
+          this.revokeRow(sessionId, waMessageId, true, source, fromApp).finally(resolve),
         ),
       );
     });
@@ -1265,22 +1289,24 @@ export class MessageProjector {
   }
 
   /** Take back a message not written yet: its row is stored cleared, and media waiting for room needs none. */
-  private holdRevoked(sessionId: string, entry: InFlightEntry): void {
+  private holdRevoked(sessionId: string, entry: InFlightEntry, fromApp = false): void {
     entry.revoked = true;
-    for (const t of this.tickets.get(sessionId) ?? []) if (t.entry === entry) t.giveUp();
+    if (!this.isAuditMode() || fromApp) {
+      for (const t of this.tickets.get(sessionId) ?? []) if (t.entry === entry) t.giveUp();
+    }
   }
 
   /**
    * Apply {@link REVOKED_ROW_PATCH}, then hand the cleared row to `message:persisted` so a plugin index
-   * keyed by row id drops the content too. Must run on the message's mutation chain. The row is the
-   * table's one under the id, which another chat's message may hold: a `source` that the row proves
-   * foreign leaves it alone.
+   * keyed by row id drops the content too. In audit compliance mode (unless deleted explicitly from the app),
+   * the message body, media, and attachments are preserved, tagged with audit revocation metadata.
    */
   private async revokeRow(
     sessionId: string,
     waMessageId: string,
     notify = true,
     source?: MutationSource,
+    fromApp = false,
   ): Promise<void> {
     // An undefined condition is DROPPED from the where-clause, which would clear every row of the session.
     if (!waMessageId) return;
@@ -1294,7 +1320,33 @@ export class MessageProjector {
         });
         return;
       }
-      const result = await this.messageRepository.update({ sessionId, waMessageId }, REVOKED_ROW_PATCH);
+
+      let result;
+      if (this.isAuditMode() && !fromApp) {
+        const existing = await this.messageRepository.findOne({ where: { sessionId, waMessageId } });
+        if (existing) {
+          const existingMeta = (existing.metadata as Record<string, unknown>) || {};
+          const auditRevoke = {
+            revoked: true,
+            revokedAt: Date.now(),
+            revokedBy: source?.author || (source?.fromMe ? 'me' : 'sender'),
+          };
+          result = await this.messageRepository.update(
+            { sessionId, waMessageId },
+            {
+              metadata: {
+                ...existingMeta,
+                revoked: auditRevoke,
+              },
+            },
+          );
+        } else {
+          result = await this.messageRepository.update({ sessionId, waMessageId }, REVOKED_ROW_PATCH);
+        }
+      } else {
+        result = await this.messageRepository.update({ sessionId, waMessageId }, REVOKED_ROW_PATCH);
+      }
+
       this.markedEdited.get(sessionId)?.delete(waMessageId);
       if (!result?.affected || !notify) return;
       const row = await this.messageRepository.findOne({ where: { sessionId, waMessageId } });
@@ -1801,11 +1853,15 @@ export class MessageProjector {
       ? { kind: 'revoke', chatId: message.chatId, fromMe: actor.fromMe, author: actor.participant, admin: actor.admin }
       : undefined;
     const apply = (): void => {
-      void this.recordRevoke(id, revokedWaMessageId, source, true);
+      void this.recordRevoke(id, revokedWaMessageId, source, true, false);
 
       // Notify consumers regardless of whether the row existed: webhook (message.revoked
       // is a declared event) + the real-time dashboard stream.
-      const revokedPayload = message as unknown as Record<string, unknown>;
+      const isAudit = this.isAuditMode();
+      const revokedPayload = {
+        ...(message as unknown as Record<string, unknown>),
+        ...(isAudit ? { preserved: true, revokedAt: Date.now() } : {}),
+      };
       void this.webhookService.dispatch(id, 'message.revoked', revokedPayload);
       this.eventsGateway.emitMessageRevoked(id, revokedPayload);
     };

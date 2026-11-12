@@ -832,9 +832,9 @@ export class MessageService implements PluginMessagePort {
     // when the engine found the message under another form of that id, under the one it keys it by: whatsapp-web.js
     // also takes the bare key id of a message it stores under the serialized id.
     const source = { kind: 'revoke', chatId: dto.chatId } as const;
-    await this.messageProjector.recordRevoke(sessionId, dto.messageId, source);
+    await this.messageProjector.recordRevoke(sessionId, dto.messageId, source, false, true);
     if (typeof deleted === 'string' && deleted && deleted !== dto.messageId) {
-      await this.messageProjector.recordRevoke(sessionId, deleted, source);
+      await this.messageProjector.recordRevoke(sessionId, deleted, source, false, true);
     }
   }
 

@@ -70,6 +70,7 @@ interface MessageRevokedEvent {
   body: string;
   type: string;
   timestamp: number;
+  preserved?: boolean;
 }
 
 /** A freshly ingested contact status (story) — the dashboard uses it purely as a refetch signal. */
@@ -485,6 +486,7 @@ export function useWebSocket(events: WebSocketEvents = {}) {
             body: String(data.body ?? ''),
             type: String(data.type),
             timestamp: Number(data.timestamp),
+            preserved: Boolean(data.preserved),
           });
           break;
         case 'message.edited':

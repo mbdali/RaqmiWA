@@ -8,6 +8,7 @@ import { ToastProvider } from './components/Toast';
 import { NumberCheckProvider } from './components/NumberCheckProvider';
 import { useRole } from './hooks/useRole';
 import { RoleProvider } from './components/RoleProvider';
+import { AuditModeProvider } from './hooks/useAuditMode';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { API_BASE_URL } from './services/api';
 import { clearActorState, isUserRole, resolveStartupValidation } from './utils/authLifecycle';
@@ -149,7 +150,9 @@ function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <RoleProvider>
-          <AppContent />
+          <AuditModeProvider>
+            <AppContent />
+          </AuditModeProvider>
         </RoleProvider>
       </QueryClientProvider>
     </ErrorBoundary>

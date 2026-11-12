@@ -25,8 +25,10 @@ import {
   CircleEllipsis,
   Copy,
   PanelRight,
+  ShieldAlert,
   X,
 } from 'lucide-react';
+import { useAuditMode } from '../hooks/useAuditMode';
 import { useProfilePicture } from '../hooks/useProfilePicture';
 import { useProfilePictures } from '../hooks/useProfilePictures';
 import { useResolvedPhone, resolvedPhoneQuery, isResolvedPhoneHeld } from '../hooks/useResolvedPhone';
@@ -181,6 +183,7 @@ export function Chats() {
   useDocumentTitle(t('nav.chats'));
   const { error: showErrorToast, warning: showWarningToast, success: showSuccessToast } = useToast();
   const { canWrite, engineType } = useRole();
+  const { auditMode, toggleAuditMode } = useAuditMode();
 
   // Sessions list & active session
   // Every listed session, ready or not: the switcher shows the others with their state.
@@ -984,7 +987,7 @@ export function Chats() {
   );
 
   const handleIncomingMessageRevoked = useCallback(
-    (event: { sessionId: string; id: string; revokedId?: string; chatId: string; type: string }) => {
+    (event: { sessionId: string; id: string; revokedId?: string; chatId: string; type: string; timestamp?: number; preserved?: boolean }) => {
       if (event.sessionId !== selectedSessionId) return;
 
       // Walk every cached chat under this session, find the deleted message and zero it — the
@@ -1003,15 +1006,30 @@ export function Chats() {
           const idx = findRevokedIndex(list, event);
           if (idx === -1) return list;
           const next = list.slice();
-          next[idx] = { ...next[idx], body: '', type: asMessageType(event.type), metadata: undefined };
+          if (event.preserved) {
+            next[idx] = {
+              ...next[idx],
+              metadata: {
+                ...(next[idx].metadata || {}),
+                revoked: {
+                  revoked: true,
+                  revokedAt: event.timestamp ? event.timestamp * 1000 : Date.now(),
+                },
+              },
+            };
+          } else {
+            next[idx] = { ...next[idx], body: '', type: asMessageType(event.type), metadata: undefined };
+          }
           return next;
         });
       }
       if (revokedLastMessage) {
         setChats(previous =>
-          previous.map(chat =>
-            chat.id === event.chatId ? { ...chat, lastMessage: '', lastMessageType: 'revoked' } : chat,
-          ),
+          previous.map(chat => {
+            if (chat.id !== event.chatId) return chat;
+            if (event.preserved && chat.lastMessage) return chat;
+            return { ...chat, lastMessage: '', lastMessageType: 'revoked' };
+          }),
         );
       } else if (!matchedCachedMessage) {
         // No cached thread proves whether the deleted message was the chat's newest; refresh the
@@ -2308,6 +2326,26 @@ export function Chats() {
                   </button>
 
                   <div className="room-header-actions">
+                    <button
+                      type="button"
+                      className={`audit-mode-toggle-btn ${auditMode ? 'active' : ''}`}
+                      onClick={toggleAuditMode}
+                      title={
+                        auditMode
+                          ? t(
+                              'chats.auditModeOnTooltip',
+                              'Audit Mode: ON (Showing deleted messages). Click to switch to normal view.',
+                            )
+                          : t(
+                              'chats.auditModeOffTooltip',
+                              'Audit Mode: OFF (Showing normal WhatsApp view). Click to show deleted messages.',
+                            )
+                      }
+                      aria-label="Toggle Audit Compliance Mode"
+                    >
+                      <ShieldAlert size={14} />
+                      <span>{auditMode ? t('chats.auditModeOn', 'Audit: ON') : t('chats.auditModeOff', 'Audit: OFF')}</span>
+                    </button>
                     <div className="room-menu" ref={roomMenuRef}>
                       <button
                         ref={roomMenuTriggerRef}

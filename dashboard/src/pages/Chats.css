@@ -2251,6 +2251,76 @@
   color: var(--chat-meta);
 }
 
+/* Audit Preserved / Revoked message badge */
+.audit-revoked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+  margin-bottom: 6px;
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  user-select: none;
+}
+
+[data-theme='dark'] .audit-revoked-badge {
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+.chats-page .message-bubble.audit-preserved-type {
+  border-left: 3px solid #ef4444;
+}
+
+.chats-page [dir='rtl'] .message-bubble.audit-preserved-type {
+  border-left: none;
+  border-right: 3px solid #ef4444;
+}
+
+/* Header Audit Mode Toggle Button */
+.audit-mode-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border-radius: 20px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  background: var(--bg-secondary, #f8fafc);
+  color: var(--text-secondary, #64748b);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.audit-mode-toggle-btn:hover {
+  background: var(--bg-hover, #f1f5f9);
+  color: var(--text-primary, #1e293b);
+  border-color: var(--border-hover, #cbd5e1);
+}
+
+.audit-mode-toggle-btn.active {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #dc2626;
+}
+
+[data-theme='dark'] .audit-mode-toggle-btn.active {
+  background: rgba(239, 68, 68, 0.22);
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #f87171;
+}
+
+.audit-mode-toggle-btn svg {
+  flex-shrink: 0;
+}
+
 /* Group sender label: the poster's name atop an incoming group bubble (colour set inline per sender). */
 .chats-page .message-sender {
   font-size: 0.8125rem;
