@@ -6,7 +6,7 @@
     }
   },
   "common": {
-    "appName": "OpenWA",
+    "appName": "RaqmiWA",
     "updateAvailable": "v{{version}} 已发布",
     "loading": "正在加载...",
     "cancel": "取消",

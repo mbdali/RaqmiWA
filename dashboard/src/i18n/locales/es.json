@@ -6,7 +6,7 @@
     }
   },
   "common": {
-    "appName": "OpenWA",
+    "appName": "RaqmiWA",
     "updateAvailable": "v{{version}} disponible",
     "loading": "Cargando...",
     "cancel": "Cancelar",
