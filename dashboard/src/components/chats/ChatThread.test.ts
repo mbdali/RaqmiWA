@@ -192,6 +192,40 @@ test('an @mention of a participant who posted in the thread shows their first na
   assert.equal(container.querySelector('.quote-body bdi')?.textContent, '@Bob');
 });
 
+test('clicking a quote box scrolls to the quoted message and highlights it', () => {
+  const targetId = 'wamid.target:123@c.us';
+  const targetMsg: ChatMessageView = {
+    ...PROMPT,
+    id: 'db-target',
+    waMessageId: targetId,
+    body: 'original message',
+  };
+  const replyingMsg: ChatMessageView = {
+    ...PROMPT,
+    id: 'db-reply',
+    waMessageId: 'wamid.reply',
+    body: 'replying to original',
+    metadata: { quotedMessage: { id: targetId, body: 'original message' } },
+  };
+
+  const { container } = renderThread('viewer', [targetMsg, replyingMsg]);
+  const quoteBox = container.querySelector('.message-quote-box') as HTMLElement;
+  assert.ok(quoteBox, 'quote box should be rendered');
+
+  const targetWrapper = container.querySelector(`[data-wa-message-id="${targetId}"]`) as HTMLElement;
+  assert.ok(targetWrapper, 'target bubble wrapper should be in DOM');
+
+  let scrolled = false;
+  targetWrapper.scrollIntoView = () => {
+    scrolled = true;
+  };
+
+  rtl.fireEvent.click(quoteBox);
+
+  assert.equal(scrolled, true, 'quoted message should have been scrolled into view');
+  assert.equal(targetWrapper.classList.contains('quote-highlight'), true, 'quoted message should be highlighted');
+});
+
 test('a document sent by URL opens in a new tab instead of navigating the dashboard away', () => {
   // Browsers ignore `download` on a cross-origin link, so a plain click would unload the dashboard.
   const doc = (id: string, data: string): ChatMessageView => ({

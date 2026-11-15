@@ -2431,6 +2431,19 @@
   width: fit-content;
 }
 
+@keyframes quoteHighlightFlash {
+  0% {
+    background-color: rgba(0, 168, 132, 0.3);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.chats-page .message-bubble-wrapper.quote-highlight .message-bubble {
+  animation: quoteHighlightFlash 1.5s ease-out;
+}
+
 /* Inbound business prompt buttons (Baileys click-button) */
 .chats-page .message-prompt-buttons {
   display: flex;

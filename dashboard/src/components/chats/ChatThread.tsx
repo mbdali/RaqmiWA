@@ -341,6 +341,31 @@ function ChatThread({
     [onClickButton],
   );
 
+  const handleQuoteClick = useCallback((qId: string, e: React.SyntheticEvent) => {
+    e.stopPropagation();
+    if (!qId) return;
+    const target = e.currentTarget as HTMLElement | null;
+    const container = target?.closest('.room-messages') ?? document;
+    const escapedId =
+      typeof CSS !== 'undefined' && typeof CSS.escape === 'function'
+        ? CSS.escape(qId)
+        : typeof window !== 'undefined' && window.CSS && typeof window.CSS.escape === 'function'
+          ? window.CSS.escape(qId)
+          : qId.replace(/["\\]/g, '\\$&');
+    const targetEl = container.querySelector<HTMLElement>(
+      `[data-wa-message-id="${escapedId}"], [data-scroll-anchor="${escapedId}"], [data-wa-message-id$="_${escapedId}"]`,
+    );
+    if (targetEl) {
+      if (typeof targetEl.scrollIntoView === 'function') {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      targetEl.classList.add('quote-highlight');
+      setTimeout(() => {
+        targetEl.classList.remove('quote-highlight');
+      }, 1500);
+    }
+  }, []);
+
   // Scroll-to-bottom button visibility. The main scroll-position memory is owned by
   // useChatScrollPosition, which doesn't expose its pin state (intentionally — that would re-render
   // the whole room on every scroll). This small listener tracks only the boolean "user is far from
@@ -765,14 +790,33 @@ function ChatThread({
                     )}
 
                     {/* Quoted message display */}
-                    {msg.metadata?.quotedMessage && (
-                      <div className="message-quote-box">
-                        <MessageBody
-                          text={resolveMentions(msg.metadata.quotedMessage.body, mentionNames)}
-                          className="quote-body"
-                        />
-                      </div>
-                    )}
+                    {msg.metadata?.quotedMessage &&
+                      (() => {
+                        const qId = msg.metadata.quotedMessage.id;
+                        return (
+                          <div
+                            className="message-quote-box"
+                            role={qId ? 'button' : undefined}
+                            tabIndex={qId ? 0 : undefined}
+                            onClick={qId ? e => handleQuoteClick(qId, e) : undefined}
+                            onKeyDown={
+                              qId
+                                ? e => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.preventDefault();
+                                      handleQuoteClick(qId, e);
+                                    }
+                                  }
+                                : undefined
+                            }
+                          >
+                            <MessageBody
+                              text={resolveMentions(msg.metadata.quotedMessage.body, mentionNames)}
+                              className="quote-body"
+                            />
+                          </div>
+                        );
+                      })()}
 
                     {renderMedia()}
 
